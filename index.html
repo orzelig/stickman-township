@@ -14,6 +14,7 @@ canvas{display:block;position:fixed;top:0;left:0;z-index:0;pointer-events:none}
 #hud-xp-bar{position:fixed;top:32px;left:0;right:0;height:6px;background:rgba(0,0,0,0.1);z-index:10}
 #hud-xp-fill{height:100%;background:#6b9edd;transition:width 0.3s}
 #toolbar{position:fixed;bottom:0;left:0;right:0;display:flex;justify-content:space-around;align-items:center;background:#f5f0e8;z-index:16;border-top:2.5px solid #2c2c2c;padding:12px 6px calc(12px + env(safe-area-inset-bottom,0px));gap:6px;pointer-events:auto}
+@supports(height:1dvh){#toolbar{bottom:calc(100vh - 100dvh)}.panel{bottom:calc(64px + env(safe-area-inset-bottom,0px) + 100vh - 100dvh)}#info-panel{bottom:calc(64px + env(safe-area-inset-bottom,0px) + 100vh - 100dvh)}}
 .tool-btn{font-family:inherit;font-size:14px;padding:10px 14px;background:#fff;border:2px solid #2c2c2c;border-radius:8px;cursor:pointer;-webkit-tap-highlight-color:transparent;color:#2c2c2c;min-width:58px;text-align:center;transition:background 0.15s}
 .tool-btn.active{background:#ffe599;border-width:2.5px;font-weight:bold}
 .tool-btn:active{transform:scale(0.95)}
@@ -68,6 +69,7 @@ canvas{display:block;position:fixed;top:0;left:0;z-index:0;pointer-events:none}
   <button class="tool-btn" data-action="factory" onclick="toolAction('factory')">&#x2699;&#xFE0F; Make</button>
   <button class="tool-btn" data-action="market" onclick="toolAction('market')">&#x1F4B0; Sell</button>
   <button class="tool-btn" data-action="bulldoze" onclick="toolAction('bulldoze')">&#x1F6A7; Clear</button>
+  <button class="tool-btn" data-action="restart" onclick="toolAction('restart')">&#x1F504; Reset</button>
 </div>
 
 <div id="build-panel" class="panel">
@@ -1065,6 +1067,23 @@ window.toolAction = function(action) {
         setToolbarActive('bulldoze');
       }
       break;
+    case 'restart':
+      hideAllPanels();
+      clearToolbarActive();
+      showDialog('Restart Game?', 'This will delete all progress and start fresh.', function() {
+        localStorage.removeItem('sticktown_save');
+        G.coins = 500; G.xp = 0; G.level = 1;
+        G.pop = 0; G.maxPop = 0; G.storageCap = 50; G.storageUsed = 0;
+        G.inventory = {}; G.buildings = []; G.crops = []; G.stickmen = [];
+        G.tutDone = false; G.tutStep = 0; G.playTime = 0;
+        _uid = 1;
+        initTiles(); initUnlocks();
+        const center = gridToScreen(GRID_W/2, GRID_H/2);
+        G.camera = {x: center.x, y: center.y, zoom: 1.0};
+        updateHUD(); recalcPop();
+        showTutorial();
+      });
+      break;
   }
 };
 
@@ -1335,14 +1354,17 @@ window.collectFactory = function(bId) {
 };
 
 // Dialog
-function showDialog(title, body) {
+let _dialogCb = null;
+function showDialog(title, body, onOk) {
   document.getElementById('dialog-title').textContent = title;
   document.getElementById('dialog-body').textContent = body;
+  _dialogCb = onOk || null;
   document.getElementById('dialog-overlay').classList.remove('hidden');
 }
 
 document.getElementById('dialog-ok').addEventListener('click', () => {
   document.getElementById('dialog-overlay').classList.add('hidden');
+  if (_dialogCb) { _dialogCb(); _dialogCb = null; }
 });
 
 // ===== SECTION I: SAVE/LOAD =====
