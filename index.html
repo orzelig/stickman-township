@@ -1,0 +1,1703 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Stickman Township</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none;font-family:'Comic Sans MS','Segoe Print','Patrick Hand',cursive;background:#f5f0e8}
+canvas{display:block;position:fixed;top:0;left:0;z-index:0;pointer-events:none}
+#hud-top{position:fixed;top:0;left:0;right:0;display:flex;justify-content:space-around;align-items:center;background:rgba(245,240,232,0.92);z-index:10;border-bottom:2px solid #2c2c2c;padding:4px 8px;font-size:13px;color:#2c2c2c;pointer-events:auto}
+#hud-top span{display:flex;align-items:center;gap:3px}
+.hud-icon{font-size:16px}
+#hud-xp-bar{position:fixed;top:32px;left:0;right:0;height:6px;background:rgba(0,0,0,0.1);z-index:10}
+#hud-xp-fill{height:100%;background:#6b9edd;transition:width 0.3s}
+#toolbar{position:fixed;bottom:0;left:0;right:0;display:flex;justify-content:space-around;align-items:center;background:rgba(245,240,232,0.95);z-index:16;border-top:2px solid #2c2c2c;padding:6px 4px;gap:4px;pointer-events:auto}
+.tool-btn{font-family:inherit;font-size:11px;padding:8px 10px;background:#fff;border:1.5px solid #2c2c2c;border-radius:6px;cursor:pointer;-webkit-tap-highlight-color:transparent;color:#2c2c2c;min-width:52px;text-align:center;transition:background 0.15s}
+.tool-btn.active{background:#ffe599;border-width:2px;font-weight:bold}
+.tool-btn:active{transform:scale(0.95)}
+.panel{position:fixed;bottom:52px;left:0;right:0;max-height:45vh;background:rgba(245,240,232,0.97);border-top:2px solid #2c2c2c;z-index:15;overflow-y:auto;padding:8px;visibility:hidden;opacity:0;transform:translateY(20px);transition:transform 0.25s ease,opacity 0.2s ease,visibility 0.2s}
+.panel.show{visibility:visible;opacity:1;transform:translateY(0)}
+.panel-header{font-size:15px;font-weight:bold;text-align:center;padding:4px 0 8px;border-bottom:1px dashed #aaa;margin-bottom:8px}
+.panel-items{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+.item-card{display:flex;flex-direction:column;align-items:center;padding:8px;border:1.5px solid #2c2c2c;border-radius:6px;background:#fff;cursor:pointer;width:80px;-webkit-tap-highlight-color:transparent}
+.item-card:active{transform:scale(0.95)}
+.item-card.locked{opacity:0.4;pointer-events:none}
+.item-card .item-icon{font-size:28px;margin-bottom:2px}
+.item-card .item-name{font-size:10px;text-align:center;line-height:1.2}
+.item-card .item-cost{font-size:10px;color:#888;margin-top:2px}
+.item-card.selected{background:#ffe599;border-width:2px}
+#info-panel{position:fixed;bottom:52px;left:10%;right:10%;max-height:40vh;background:rgba(245,240,232,0.97);border:2px solid #2c2c2c;border-radius:10px;z-index:20;padding:12px;transform:translateY(120%);transition:transform 0.25s ease}
+#info-panel.show{transform:translateY(-8px)}
+#info-panel .info-title{font-size:16px;font-weight:bold;text-align:center;margin-bottom:6px}
+#info-panel .info-body{font-size:12px;text-align:center;line-height:1.5}
+#info-panel button{display:block;margin:8px auto 0;font-family:inherit;font-size:12px;padding:6px 16px;background:#fff;border:1.5px solid #2c2c2c;border-radius:6px;cursor:pointer}
+#info-panel .recipe-list{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:8px}
+.recipe-btn{font-family:inherit;font-size:11px;padding:6px 10px;background:#fff;border:1.5px solid #2c2c2c;border-radius:6px;cursor:pointer}
+.recipe-btn:active{transform:scale(0.95)}
+.recipe-btn.active-recipe{background:#c6e8b0;border-width:2px}
+.recipe-btn:disabled{opacity:0.4}
+#dialog-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.3);z-index:30;display:flex;align-items:center;justify-content:center}
+#dialog-overlay.hidden{display:none}
+#dialog-box{background:#f5f0e8;border:2.5px solid #2c2c2c;border-radius:12px;padding:20px;max-width:85vw;min-width:240px;text-align:center}
+#dialog-title{font-size:18px;font-weight:bold;margin-bottom:8px}
+#dialog-body{font-size:13px;margin-bottom:14px;line-height:1.5}
+#dialog-ok{font-family:inherit;font-size:14px;padding:8px 24px;background:#ffe599;border:2px solid #2c2c2c;border-radius:8px;cursor:pointer;font-weight:bold}
+.progress-bar{width:100%;height:10px;background:rgba(0,0,0,0.1);border-radius:5px;border:1px solid #2c2c2c;margin:6px 0;overflow:hidden}
+.progress-fill{height:100%;border-radius:5px;transition:width 0.3s}
+@supports(padding:env(safe-area-inset-top)){
+  #hud-top{padding-top:calc(env(safe-area-inset-top) + 4px)}
+  #toolbar{padding-bottom:calc(env(safe-area-inset-bottom) + 4px)}
+}
+</style>
+</head>
+<body>
+<canvas id="gameCanvas"></canvas>
+
+<div id="hud-top">
+  <span><span class="hud-icon">&#x1FA99;</span> <span id="hud-coins">500</span></span>
+  <span>&#11088; Lvl <span id="hud-level">1</span></span>
+  <span>&#x1F464; <span id="hud-pop">0</span>/<span id="hud-maxpop">0</span></span>
+  <span>&#x1F4E6; <span id="hud-storage">0</span>/<span id="hud-storecap">50</span></span>
+</div>
+<div id="hud-xp-bar"><div id="hud-xp-fill" style="width:0%"></div></div>
+
+<div id="toolbar">
+  <button class="tool-btn" data-action="build" onclick="toolAction('build')">&#x1F3E0; Build</button>
+  <button class="tool-btn" data-action="farm" onclick="toolAction('farm')">&#x1F33E; Farm</button>
+  <button class="tool-btn" data-action="factory" onclick="toolAction('factory')">&#x2699;&#xFE0F; Make</button>
+  <button class="tool-btn" data-action="market" onclick="toolAction('market')">&#x1F4B0; Sell</button>
+  <button class="tool-btn" data-action="bulldoze" onclick="toolAction('bulldoze')">&#x1F6A7; Clear</button>
+</div>
+
+<div id="build-panel" class="panel">
+  <div class="panel-header">Buildings</div>
+  <div class="panel-items" id="build-items"></div>
+</div>
+
+<div id="farm-panel" class="panel">
+  <div class="panel-header">Crops</div>
+  <div class="panel-items" id="farm-items"></div>
+</div>
+
+<div id="factory-panel" class="panel">
+  <div class="panel-header">Factories</div>
+  <div class="panel-items" id="factory-items"></div>
+</div>
+
+<div id="market-panel" class="panel">
+  <div class="panel-header">Market - Sell Goods</div>
+  <div class="panel-items" id="market-items"></div>
+</div>
+
+<div id="info-panel">
+  <div class="info-title" id="info-title"></div>
+  <div class="info-body" id="info-body"></div>
+</div>
+
+<div id="dialog-overlay" class="hidden">
+  <div id="dialog-box">
+    <div id="dialog-title"></div>
+    <div id="dialog-body"></div>
+    <button id="dialog-ok">OK</button>
+  </div>
+</div>
+<script>
+// ===== SECTION A: CONSTANTS & CONFIGURATION =====
+
+const TILE_W = 64, TILE_H = 32;
+const GRID_W = 24, GRID_H = 24;
+
+const COLORS = {
+  pencil: '#2c2c2c', paper: '#f5f0e8', grass: '#c8dda0',
+  dirt: '#d4bc94', water: '#9ec5e8', wood: '#a0785a',
+  roof: '#cc6644', stone: '#aaa89e'
+};
+
+function mulberry32(seed) {
+  return function() {
+    seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+    let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+let _uid = 1;
+function uid() { return _uid++; }
+
+const BUILDING_DEFS = {
+  field: { name: 'Field', icon: '🌱', cat: 'farming', size: [1,1], cost: 30, xp: 3, unlockLvl: 1 },
+  house_s: { name: 'Small House', icon: '🏠', cat: 'residential', size: [1,1], cost: 80, xp: 8, popAdd: 5, unlockLvl: 1 },
+  barn: { name: 'Barn', icon: '🏚️', cat: 'storage', size: [2,2], cost: 150, xp: 12, storageAdd: 30, unlockLvl: 1 },
+  house_m: { name: 'Medium House', icon: '🏡', cat: 'residential', size: [2,1], cost: 350, xp: 20, popAdd: 12, unlockLvl: 5 },
+  market: { name: 'Market', icon: '🏪', cat: 'commerce', size: [2,1], cost: 250, xp: 15, unlockLvl: 3 },
+  bakery: { name: 'Bakery', icon: '🍞', cat: 'factory', size: [2,2], cost: 400, xp: 25, unlockLvl: 4 },
+  dairy: { name: 'Dairy', icon: '🧀', cat: 'factory', size: [2,2], cost: 600, xp: 30, unlockLvl: 6 },
+  juice: { name: 'Juice Press', icon: '🧃', cat: 'factory', size: [2,2], cost: 900, xp: 35, unlockLvl: 9 },
+  tree: { name: 'Tree', icon: '🌳', cat: 'deco', size: [1,1], cost: 20, xp: 1, unlockLvl: 1 },
+  bench: { name: 'Bench', icon: '🪑', cat: 'deco', size: [1,1], cost: 15, xp: 1, unlockLvl: 2 },
+  fountain: { name: 'Fountain', icon: '⛲', cat: 'deco', size: [1,1], cost: 200, xp: 10, unlockLvl: 8 },
+  house_l: { name: 'Large House', icon: '🏘️', cat: 'residential', size: [2,2], cost: 800, xp: 40, popAdd: 25, unlockLvl: 10 },
+  well: { name: 'Well', icon: '🪣', cat: 'utility', size: [1,1], cost: 100, xp: 8, unlockLvl: 2 },
+};
+
+const CROP_DEFS = {
+  wheat:  { name: 'Wheat',  icon: '🌾', growTime: 60,  sell: 4,  xp: 1, unlockLvl: 1, color: '#d4a843' },
+  corn:   { name: 'Corn',   icon: '🌽', growTime: 150, sell: 8,  xp: 2, unlockLvl: 3, color: '#e8c83a' },
+  carrot: { name: 'Carrot', icon: '🥕', growTime: 100, sell: 6,  xp: 2, unlockLvl: 5, color: '#e87830' },
+  tomato: { name: 'Tomato', icon: '🍅', growTime: 240, sell: 12, xp: 3, unlockLvl: 7, color: '#cc3333' },
+  sugar:  { name: 'Sugar',  icon: '🍬', growTime: 360, sell: 16, xp: 4, unlockLvl: 10, color: '#88cc66' },
+};
+
+const FACTORY_RECIPES = {
+  bakery: [
+    { name: 'Bread', inputs: {wheat:3}, out: 'bread', qty: 1, time: 30, sell: 20, icon: '🍞' },
+    { name: 'Cookie', inputs: {wheat:2, sugar:1}, out: 'cookie', qty: 2, time: 45, sell: 30, icon: '🍪' },
+  ],
+  dairy: [
+    { name: 'Cheese', inputs: {corn:2}, out: 'cheese', qty: 1, time: 50, sell: 30, icon: '🧀' },
+    { name: 'Butter', inputs: {wheat:1, corn:1}, out: 'butter', qty: 1, time: 35, sell: 22, icon: '🧈' },
+  ],
+  juice: [
+    { name: 'Carrot Juice', inputs: {carrot:3}, out: 'cjuice', qty: 1, time: 40, sell: 28, icon: '🥤' },
+    { name: 'Tomato Sauce', inputs: {tomato:2}, out: 'tsauce', qty: 1, time: 55, sell: 38, icon: '🫙' },
+  ],
+};
+
+const GOODS_INFO = {
+  bread: {name:'Bread',icon:'🍞',sell:20}, cookie: {name:'Cookie',icon:'🍪',sell:30},
+  cheese: {name:'Cheese',icon:'🧀',sell:30}, butter: {name:'Butter',icon:'🧈',sell:22},
+  cjuice: {name:'Carrot Juice',icon:'🥤',sell:28}, tsauce: {name:'Tomato Sauce',icon:'🫙',sell:38},
+};
+
+const LEVEL_TABLE = [
+  { lvl:1, xp:0, unlocks:['field','house_s','barn','tree','well'] },
+  { lvl:2, xp:40, unlocks:['bench'] },
+  { lvl:3, xp:120, unlocks:['corn','market'] },
+  { lvl:4, xp:260, unlocks:['bakery'] },
+  { lvl:5, xp:450, unlocks:['house_m','carrot'] },
+  { lvl:6, xp:700, unlocks:['dairy'] },
+  { lvl:7, xp:1000, unlocks:['tomato'] },
+  { lvl:8, xp:1400, unlocks:['fountain'] },
+  { lvl:9, xp:1900, unlocks:['juice'] },
+  { lvl:10, xp:2500, unlocks:['sugar','house_l'] },
+  { lvl:11, xp:3200, unlocks:[] },
+  { lvl:12, xp:4000, unlocks:[] },
+];
+
+// ===== SECTION B: DOODLE RENDERING ENGINE =====
+
+function sketchLine(ctx, x0, y0, x1, y1, opts) {
+  opts = opts || {};
+  const rough = opts.roughness != null ? opts.roughness : 1.0;
+  const rng = opts.rng || Math.random;
+  const dx = x1 - x0, dy = y1 - y0;
+  const len = Math.sqrt(dx * dx + dy * dy);
+  const segs = Math.max(3, Math.floor(len / 20));
+  ctx.save();
+  ctx.strokeStyle = opts.stroke || COLORS.pencil;
+  ctx.lineWidth = opts.lineWidth || 1.5;
+  ctx.lineCap = 'round';
+  ctx.globalAlpha = opts.alpha || 0.85;
+  ctx.beginPath();
+  ctx.moveTo(x0 + (rng() - 0.5) * rough, y0 + (rng() - 0.5) * rough);
+  for (let i = 1; i <= segs; i++) {
+    const t = i / segs;
+    const mx = x0 + dx * t;
+    const my = y0 + dy * t;
+    const off = rough * 2 * (rng() - 0.5) * Math.sin(Math.PI * t);
+    const nx = dy / (len || 1), ny = -dx / (len || 1);
+    ctx.lineTo(mx + nx * off, my + ny * off);
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
+function sketchRect(ctx, x, y, w, h, opts) {
+  opts = opts || {};
+  const rng = opts.rng || Math.random;
+  const j = (opts.roughness || 1) * 1.5;
+  const tl = [x + (rng()-.5)*j, y + (rng()-.5)*j];
+  const tr = [x+w + (rng()-.5)*j, y + (rng()-.5)*j];
+  const br = [x+w + (rng()-.5)*j, y+h + (rng()-.5)*j];
+  const bl = [x + (rng()-.5)*j, y+h + (rng()-.5)*j];
+  if (opts.fill) {
+    ctx.save();
+    ctx.globalAlpha = opts.fillAlpha || 0.6;
+    ctx.fillStyle = opts.fill;
+    ctx.beginPath();
+    ctx.moveTo(tl[0],tl[1]); ctx.lineTo(tr[0],tr[1]);
+    ctx.lineTo(br[0],br[1]); ctx.lineTo(bl[0],bl[1]);
+    ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+  sketchLine(ctx, tl[0],tl[1], tr[0],tr[1], opts);
+  sketchLine(ctx, tr[0],tr[1], br[0],br[1], opts);
+  sketchLine(ctx, br[0],br[1], bl[0],bl[1], opts);
+  sketchLine(ctx, bl[0],bl[1], tl[0],tl[1], opts);
+}
+
+function sketchCircle(ctx, cx, cy, r, opts) {
+  opts = opts || {};
+  const rng = opts.rng || Math.random;
+  const rough = opts.roughness != null ? opts.roughness : 0.6;
+  const pts = Math.max(12, Math.floor(r * 1.5));
+  if (opts.fill) {
+    ctx.save();
+    ctx.globalAlpha = opts.fillAlpha || 0.5;
+    ctx.fillStyle = opts.fill;
+    ctx.beginPath();
+    for (let i = 0; i <= pts; i++) {
+      const a = (i / pts) * Math.PI * 2;
+      const rr = r + (rng()-.5) * rough * 2;
+      const px = cx + Math.cos(a) * rr, py = cy + Math.sin(a) * rr;
+      i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+    }
+    ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+  ctx.save();
+  ctx.strokeStyle = opts.stroke || COLORS.pencil;
+  ctx.lineWidth = opts.lineWidth || 1.5;
+  ctx.lineCap = 'round';
+  ctx.globalAlpha = opts.alpha || 0.85;
+  ctx.beginPath();
+  for (let i = 0; i <= pts; i++) {
+    const a = (i / pts) * Math.PI * 2;
+    const rr = r + (rng()-.5) * rough * 3;
+    const px = cx + Math.cos(a) * rr, py = cy + Math.sin(a) * rr;
+    i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+  }
+  ctx.closePath(); ctx.stroke();
+  ctx.restore();
+}
+
+function sketchPoly(ctx, points, opts) {
+  opts = opts || {};
+  if (opts.fill) {
+    ctx.save();
+    ctx.globalAlpha = opts.fillAlpha || 0.5;
+    ctx.fillStyle = opts.fill;
+    ctx.beginPath();
+    points.forEach((p,i) => i === 0 ? ctx.moveTo(p[0],p[1]) : ctx.lineTo(p[0],p[1]));
+    ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+  for (let i = 0; i < points.length; i++) {
+    const a = points[i], b = points[(i+1) % points.length];
+    sketchLine(ctx, a[0], a[1], b[0], b[1], opts);
+  }
+}
+
+function hachureFill(ctx, points, opts) {
+  opts = opts || {};
+  const rng = opts.rng || Math.random;
+  const gap = opts.gap || 5;
+  const angle = (opts.angle || -41) * Math.PI / 180;
+  const color = opts.color || COLORS.pencil;
+  let minX=Infinity, minY=Infinity, maxX=-Infinity, maxY=-Infinity;
+  for (const p of points) {
+    if (p[0]<minX) minX=p[0]; if (p[0]>maxX) maxX=p[0];
+    if (p[1]<minY) minY=p[1]; if (p[1]>maxY) maxY=p[1];
+  }
+  const cx = (minX+maxX)/2, cy = (minY+maxY)/2;
+  const diag = Math.sqrt((maxX-minX)**2 + (maxY-minY)**2);
+  const cosA = Math.cos(angle), sinA = Math.sin(angle);
+  ctx.save();
+  ctx.beginPath();
+  points.forEach((p,i) => i===0 ? ctx.moveTo(p[0],p[1]) : ctx.lineTo(p[0],p[1]));
+  ctx.closePath(); ctx.clip();
+  for (let d = -diag/2; d < diag/2; d += gap) {
+    const x0 = cx + cosA*(-diag) - sinA*d;
+    const y0 = cy + sinA*(-diag) + cosA*d;
+    const x1 = cx + cosA*(diag) - sinA*d;
+    const y1 = cy + sinA*(diag) + cosA*d;
+    sketchLine(ctx, x0, y0, x1, y1, {stroke: color, lineWidth: 0.8, roughness: 0.5, alpha: 0.4, rng});
+  }
+  ctx.restore();
+}
+
+// ===== SECTION C: GAME STATE =====
+
+const G = {
+  coins: 500, xp: 0, level: 1,
+  pop: 0, maxPop: 0,
+  storageCap: 50, storageUsed: 0,
+  inventory: {},
+  buildings: [], crops: [], stickmen: [],
+  tiles: [],
+  camera: { x: 0, y: 0, zoom: 1.0 },
+  unlocked: new Set(),
+  lastSave: Date.now(),
+  tutDone: false, tutStep: 0,
+  playTime: 0,
+};
+
+function initTiles() {
+  G.tiles = [];
+  for (let gy = 0; gy < GRID_H; gy++) {
+    G.tiles[gy] = [];
+    for (let gx = 0; gx < GRID_W; gx++) {
+      G.tiles[gy][gx] = { type: 'empty', entityId: null };
+    }
+  }
+}
+
+function recalcPop() {
+  let pop = 0, maxP = 0, storAdd = 0;
+  for (const b of G.buildings) {
+    const def = BUILDING_DEFS[b.type];
+    if (def.popAdd) maxP += def.popAdd;
+    if (def.storageAdd) storAdd += def.storageAdd;
+  }
+  G.maxPop = maxP;
+  G.pop = Math.min(G.stickmen.length * 3, maxP);
+  G.storageCap = 50 + storAdd;
+  recalcStorage();
+}
+
+function recalcStorage() {
+  let used = 0;
+  for (const k in G.inventory) used += G.inventory[k];
+  G.storageUsed = used;
+}
+
+function initUnlocks() {
+  G.unlocked = new Set();
+  for (const row of LEVEL_TABLE) {
+    if (row.lvl <= G.level) row.unlocks.forEach(u => G.unlocked.add(u));
+  }
+}
+
+// ===== SECTION D: ISOMETRIC GRID =====
+
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+let W, H, dpr;
+
+function resize() {
+  dpr = window.devicePixelRatio || 1;
+  W = window.innerWidth; H = window.innerHeight;
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+window.addEventListener('resize', resize);
+resize();
+
+function gridToScreen(gx, gy) {
+  return {
+    x: (gx - gy) * (TILE_W / 2),
+    y: (gx + gy) * (TILE_H / 2)
+  };
+}
+
+function screenToGrid(sx, sy) {
+  const wx = (sx - W/2) / G.camera.zoom + G.camera.x;
+  const wy = (sy - H/2) / G.camera.zoom + G.camera.y;
+  const gx = (wx / (TILE_W/2) + wy / (TILE_H/2)) / 2;
+  const gy = (wy / (TILE_H/2) - wx / (TILE_W/2)) / 2;
+  return { gx: Math.floor(gx), gy: Math.floor(gy) };
+}
+
+function worldToScreen(wx, wy) {
+  return {
+    x: (wx - G.camera.x) * G.camera.zoom + W/2,
+    y: (wy - G.camera.y) * G.camera.zoom + H/2
+  };
+}
+
+function applyCamera() {
+  ctx.save();
+  ctx.translate(W/2, H/2);
+  ctx.scale(G.camera.zoom, G.camera.zoom);
+  ctx.translate(-G.camera.x, -G.camera.y);
+}
+
+function restoreCamera() { ctx.restore(); }
+
+// ===== SECTION E: ENTITY DRAWING =====
+
+function drawTileDiamond(ctx, sx, sy, fillColor, seed) {
+  const rng = mulberry32(seed);
+  const pts = [
+    [sx, sy - TILE_H/2],
+    [sx + TILE_W/2, sy],
+    [sx, sy + TILE_H/2],
+    [sx - TILE_W/2, sy]
+  ];
+  sketchPoly(ctx, pts, { fill: fillColor, fillAlpha: 0.45, rng, roughness: 0.6, stroke: COLORS.pencil, lineWidth: 1, alpha: 0.3 });
+}
+
+function drawGrassTile(ctx, sx, sy, seed) {
+  drawTileDiamond(ctx, sx, sy, COLORS.grass, seed);
+}
+
+function drawFieldTile(ctx, sx, sy, seed) {
+  drawTileDiamond(ctx, sx, sy, COLORS.dirt, seed);
+  const rng = mulberry32(seed + 99);
+  for (let i = 0; i < 3; i++) {
+    const lx = sx - 12 + i * 12;
+    sketchLine(ctx, lx, sy - 4, lx, sy + 6, {roughness:0.3,rng,stroke:'#8B7355',lineWidth:0.8,alpha:0.5});
+  }
+}
+
+function drawCropOnField(ctx, sx, sy, crop) {
+  const def = CROP_DEFS[crop.type];
+  const elapsed = (Date.now() - crop.plantedAt) / 1000;
+  const speed = crop.watered ? 2 : 1;
+  const progress = Math.min(1, (elapsed * speed) / def.growTime);
+  const stage = progress >= 1 ? 3 : Math.floor(progress * 3);
+  crop.stage = stage;
+  const rng = mulberry32(crop.id * 7);
+  const col = def.color;
+
+  if (stage === 0) {
+    for (let i = 0; i < 4; i++) {
+      const dx = (rng()-.5)*20, dy = (rng()-.5)*10;
+      ctx.fillStyle = '#6b5b3a';
+      ctx.globalAlpha = 0.6;
+      ctx.beginPath(); ctx.arc(sx+dx, sy+dy, 1.5, 0, Math.PI*2); ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+  } else if (stage === 1) {
+    for (let i = 0; i < 4; i++) {
+      const dx = (rng()-.5)*20, dy = (rng()-.5)*10;
+      sketchLine(ctx, sx+dx, sy+dy+4, sx+dx, sy+dy-3, {stroke:'#5a8a3a',lineWidth:1,roughness:0.3,rng});
+    }
+  } else if (stage === 2) {
+    for (let i = 0; i < 5; i++) {
+      const dx = (rng()-.5)*22, dy = (rng()-.5)*10;
+      const h = 6 + rng()*4;
+      sketchLine(ctx, sx+dx, sy+dy+4, sx+dx, sy+dy-h, {stroke:'#4a7a2a',lineWidth:1.2,roughness:0.4,rng});
+      sketchLine(ctx, sx+dx, sy+dy-h, sx+dx+3, sy+dy-h-2, {stroke:'#5a9a3a',lineWidth:0.8,roughness:0.3,rng});
+    }
+  } else {
+    for (let i = 0; i < 5; i++) {
+      const dx = (rng()-.5)*22, dy = (rng()-.5)*10;
+      const h = 10 + rng()*4;
+      sketchLine(ctx, sx+dx, sy+dy+4, sx+dx, sy+dy-h, {stroke:'#3a6a1a',lineWidth:1.5,roughness:0.3,rng});
+      sketchCircle(ctx, sx+dx, sy+dy-h-2, 3, {fill:col,fillAlpha:0.8,roughness:0.3,rng,stroke:col,lineWidth:0.5,alpha:0.8});
+    }
+  }
+
+  if (crop.watered) {
+    ctx.globalAlpha = 0.3;
+    ctx.fillStyle = '#6ba5d6';
+    for (let i = 0; i < 3; i++) {
+      const dx = (rng()-.5)*16, dy = (rng()-.5)*8;
+      ctx.beginPath(); ctx.arc(sx+dx, sy+dy+6, 2, 0, Math.PI*2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+}
+
+function drawSmallHouse(ctx, sx, sy, seed) {
+  const rng = mulberry32(seed);
+  const bx = sx, by = sy;
+  sketchRect(ctx, bx-14, by-22, 28, 20, {fill:'#f0e6d0',fillAlpha:0.7,rng,roughness:0.8});
+  const roofPts = [[bx-17,by-22],[bx,by-38],[bx+17,by-22]];
+  sketchPoly(ctx, roofPts, {fill:COLORS.roof,fillAlpha:0.6,rng,roughness:0.8});
+  hachureFill(ctx, roofPts, {gap:4,angle:-30,color:COLORS.roof,rng});
+  sketchRect(ctx, bx-4, by-8, 8, 10, {fill:'#5a3a1a',fillAlpha:0.7,rng,roughness:0.5});
+  sketchRect(ctx, bx+8, by-18, 5, 5, {fill:'#9ec5e8',fillAlpha:0.5,rng,roughness:0.5});
+  sketchLine(ctx, bx+10.5, by-18, bx+10.5, by-13, {rng,roughness:0.3,alpha:0.4});
+  sketchLine(ctx, bx+8, by-15.5, bx+13, by-15.5, {rng,roughness:0.3,alpha:0.4});
+}
+
+function drawMediumHouse(ctx, sx, sy, seed) {
+  const rng = mulberry32(seed);
+  sketchRect(ctx, sx-22, sy-28, 44, 26, {fill:'#e8dcc8',fillAlpha:0.7,rng,roughness:0.8});
+  const roofPts = [[sx-25,sy-28],[sx,sy-46],[sx+25,sy-28]];
+  sketchPoly(ctx, roofPts, {fill:'#8B6B4A',fillAlpha:0.6,rng,roughness:0.8});
+  hachureFill(ctx, roofPts, {gap:4,angle:-35,color:'#8B6B4A',rng});
+  sketchRect(ctx, sx-5, sy-10, 10, 12, {fill:'#5a3a1a',fillAlpha:0.7,rng,roughness:0.5});
+  sketchRect(ctx, sx-16, sy-22, 6, 6, {fill:'#9ec5e8',fillAlpha:0.5,rng,roughness:0.5});
+  sketchRect(ctx, sx+10, sy-22, 6, 6, {fill:'#9ec5e8',fillAlpha:0.5,rng,roughness:0.5});
+}
+
+function drawLargeHouse(ctx, sx, sy, seed) {
+  const rng = mulberry32(seed);
+  sketchRect(ctx, sx-26, sy-38, 52, 36, {fill:'#ddd4c4',fillAlpha:0.7,rng,roughness:0.8});
+  const roofPts = [[sx-30,sy-38],[sx,sy-58],[sx+30,sy-38]];
+  sketchPoly(ctx, roofPts, {fill:'#994433',fillAlpha:0.6,rng,roughness:0.8});
+  hachureFill(ctx, roofPts, {gap:4,angle:-30,color:'#994433',rng});
+  sketchRect(ctx, sx-6, sy-14, 12, 16, {fill:'#5a3a1a',fillAlpha:0.7,rng,roughness:0.5});
+  for (let i = -1; i <= 1; i += 2) {
+    sketchRect(ctx, sx+i*16-3, sy-32, 6, 6, {fill:'#9ec5e8',fillAlpha:0.5,rng,roughness:0.5});
+  }
+  sketchRect(ctx, sx+18, sy-52, 4, 14, {fill:'#888',fillAlpha:0.6,rng,roughness:0.6});
+}
+
+function drawBarn(ctx, sx, sy, seed) {
+  const rng = mulberry32(seed);
+  sketchRect(ctx, sx-24, sy-32, 48, 30, {fill:'#c47a5a',fillAlpha:0.6,rng,roughness:0.8});
+  hachureFill(ctx, [[sx-24,sy-32],[sx+24,sy-32],[sx+24,sy-2],[sx-24,sy-2]], {gap:5,angle:0,color:'#a05a3a',rng});
+  const roofPts = [[sx-28,sy-32],[sx,sy-50],[sx+28,sy-32]];
+  sketchPoly(ctx, roofPts, {fill:'#8B4513',fillAlpha:0.6,rng,roughness:0.8});
+  sketchRect(ctx, sx-10, sy-12, 20, 14, {fill:'#3a2a1a',fillAlpha:0.6,rng,roughness:0.6});
+  sketchLine(ctx, sx, sy-32, sx, sy-2, {rng,roughness:0.4,alpha:0.3});
+}
+
+function drawMarket(ctx, sx, sy, seed) {
+  const rng = mulberry32(seed);
+  for (let i = -1; i <= 1; i += 2) {
+    sketchLine(ctx, sx+i*18, sy-2, sx+i*18, sy-26, {rng,roughness:0.6,lineWidth:2});
+  }
+  const awnPts = [[sx-22,sy-26],[sx-22,sy-20],[sx+22,sy-20],[sx+22,sy-26]];
+  sketchPoly(ctx, awnPts, {fill:'#dd6644',fillAlpha:0.6,rng,roughness:0.6});
+  hachureFill(ctx, awnPts, {gap:4,angle:0,color:'#fff',rng});
+  sketchRect(ctx, sx-16, sy-6, 32, 8, {fill:COLORS.wood,fillAlpha:0.5,rng,roughness:0.6});
+  for (let i = 0; i < 3; i++) {
+    sketchCircle(ctx, sx-10+i*10, sy-4, 3, {fill:['#e8c83a','#cc3333','#e87830'][i],fillAlpha:0.7,rng,roughness:0.3});
+  }
+}
+
+function drawFactory(ctx, sx, sy, seed, type) {
+  const rng = mulberry32(seed);
+  const col = type === 'bakery' ? '#d4a060' : type === 'dairy' ? '#b0c8e0' : '#a0d080';
+  sketchRect(ctx, sx-24, sy-34, 48, 32, {fill:col,fillAlpha:0.6,rng,roughness:0.8});
+  sketchRect(ctx, sx-24, sy-34, 48, 8, {fill:'#666',fillAlpha:0.4,rng,roughness:0.6});
+  sketchRect(ctx, sx-8, sy-12, 16, 14, {fill:'#5a3a1a',fillAlpha:0.6,rng,roughness:0.5});
+  sketchRect(ctx, sx+14, sy-42, 6, 16, {fill:'#888',fillAlpha:0.6,rng,roughness:0.6});
+  // smoke puffs for active factory
+  const b = G.buildings.find(b => b.gridX === screenToGrid(sx, sy).gx);
+  // Draw gear/icon
+  ctx.save();
+  ctx.font = '14px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(type === 'bakery' ? '🍞' : type === 'dairy' ? '🧀' : '🧃', sx, sy-18);
+  ctx.restore();
+}
+
+function drawTree(ctx, sx, sy, seed) {
+  const rng = mulberry32(seed);
+  sketchLine(ctx, sx, sy+2, sx, sy-12, {stroke:COLORS.wood,lineWidth:2.5,roughness:0.4,rng});
+  sketchCircle(ctx, sx, sy-18, 10, {fill:'#5a9a3a',fillAlpha:0.6,roughness:0.8,rng,stroke:'#3a7a1a',lineWidth:1});
+  sketchCircle(ctx, sx-5, sy-14, 7, {fill:'#6aaa4a',fillAlpha:0.5,roughness:0.6,rng,stroke:'#4a8a2a',lineWidth:0.8});
+  sketchCircle(ctx, sx+5, sy-14, 7, {fill:'#4a8a2a',fillAlpha:0.5,roughness:0.6,rng,stroke:'#3a7a1a',lineWidth:0.8});
+}
+
+function drawBench(ctx, sx, sy, seed) {
+  const rng = mulberry32(seed);
+  sketchRect(ctx, sx-10, sy-4, 20, 4, {fill:COLORS.wood,fillAlpha:0.7,rng,roughness:0.6});
+  sketchLine(ctx, sx-8, sy, sx-8, sy+4, {rng,roughness:0.4,lineWidth:1.5});
+  sketchLine(ctx, sx+8, sy, sx+8, sy+4, {rng,roughness:0.4,lineWidth:1.5});
+  sketchLine(ctx, sx-10, sy-6, sx-10, sy-2, {rng,roughness:0.4,lineWidth:1.5});
+  sketchLine(ctx, sx+10, sy-6, sx+10, sy-2, {rng,roughness:0.4,lineWidth:1.5});
+}
+
+function drawFountain(ctx, sx, sy, seed) {
+  const rng = mulberry32(seed);
+  sketchCircle(ctx, sx, sy-2, 12, {fill:'#aaa',fillAlpha:0.5,rng,roughness:0.6});
+  sketchCircle(ctx, sx, sy-2, 8, {fill:COLORS.water,fillAlpha:0.5,rng,roughness:0.4});
+  sketchLine(ctx, sx, sy-12, sx, sy-20, {stroke:COLORS.water,lineWidth:1.5,roughness:0.8,rng,alpha:0.6});
+  const t = Date.now() / 300;
+  for (let i = 0; i < 3; i++) {
+    const a = t + i * 2.1;
+    const dx = Math.cos(a) * 4, dy = -18 + Math.sin(a) * 2;
+    ctx.globalAlpha = 0.4;
+    ctx.fillStyle = COLORS.water;
+    ctx.beginPath(); ctx.arc(sx+dx, sy+dy, 1.5, 0, Math.PI*2); ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+}
+
+function drawWell(ctx, sx, sy, seed) {
+  const rng = mulberry32(seed);
+  sketchCircle(ctx, sx, sy, 8, {fill:'#888',fillAlpha:0.4,rng,roughness:0.6});
+  sketchCircle(ctx, sx, sy, 5, {fill:COLORS.water,fillAlpha:0.5,rng,roughness:0.3});
+  sketchLine(ctx, sx-6, sy-8, sx-6, sy-16, {rng,roughness:0.4,lineWidth:1.5});
+  sketchLine(ctx, sx+6, sy-8, sx+6, sy-16, {rng,roughness:0.4,lineWidth:1.5});
+  sketchLine(ctx, sx-8, sy-16, sx+8, sy-16, {rng,roughness:0.5,lineWidth:1.5});
+}
+
+function drawBuilding(ctx, b) {
+  const def = BUILDING_DEFS[b.type];
+  const sz = def.size;
+  const anchor = gridToScreen(b.gridX + sz[0]/2 - 0.5, b.gridY + sz[1]/2 - 0.5);
+  const sx = anchor.x, sy = anchor.y;
+  const seed = b.id * 137 + b.gridX * 31 + b.gridY * 17;
+
+  switch(b.type) {
+    case 'house_s': drawSmallHouse(ctx, sx, sy, seed); break;
+    case 'house_m': drawMediumHouse(ctx, sx, sy, seed); break;
+    case 'house_l': drawLargeHouse(ctx, sx, sy, seed); break;
+    case 'barn': drawBarn(ctx, sx, sy, seed); break;
+    case 'market': drawMarket(ctx, sx, sy, seed); break;
+    case 'bakery': case 'dairy': case 'juice': drawFactory(ctx, sx, sy, seed, b.type); break;
+    case 'tree': drawTree(ctx, sx, sy, seed); break;
+    case 'bench': drawBench(ctx, sx, sy, seed); break;
+    case 'fountain': drawFountain(ctx, sx, sy, seed); break;
+    case 'well': drawWell(ctx, sx, sy, seed); break;
+  }
+
+  // Factory production indicator
+  if (['bakery','dairy','juice'].includes(b.type) && b.recipe != null) {
+    const recipes = FACTORY_RECIPES[b.type];
+    const recipe = recipes[b.recipe];
+    if (b.prodDone) {
+      ctx.save(); ctx.font='16px sans-serif'; ctx.textAlign='center';
+      ctx.fillText('❗', sx, sy - 50);
+      ctx.restore();
+    } else if (b.prodStart) {
+      const elapsed = (Date.now() - b.prodStart) / 1000;
+      const pct = Math.min(1, elapsed / recipe.time);
+      ctx.save();
+      ctx.fillStyle = 'rgba(0,0,0,0.15)';
+      ctx.fillRect(sx-14, sy-48, 28, 5);
+      ctx.fillStyle = '#6b9edd';
+      ctx.fillRect(sx-14, sy-48, 28*pct, 5);
+      ctx.strokeStyle = COLORS.pencil; ctx.lineWidth = 0.8;
+      ctx.strokeRect(sx-14, sy-48, 28, 5);
+      ctx.restore();
+    }
+  }
+}
+
+// Stickman drawing
+function drawStickman(ctx, s) {
+  const rng = mulberry32(s.seed);
+  const x = s.x, y = s.y;
+  const walk = s.state === 'walk';
+  const f = s.animFrame;
+
+  ctx.save();
+  ctx.strokeStyle = COLORS.pencil;
+  ctx.lineWidth = 1.5;
+  ctx.lineCap = 'round';
+  ctx.globalAlpha = 0.8;
+
+  // Head
+  ctx.beginPath(); ctx.arc(x, y-16, 4, 0, Math.PI*2); ctx.stroke();
+  // Eyes
+  ctx.fillStyle = COLORS.pencil;
+  ctx.fillRect(x-1.5, y-17, 1, 1);
+  ctx.fillRect(x+1, y-17, 1, 1);
+  // Smile
+  ctx.beginPath(); ctx.arc(x, y-14.5, 2, 0.1, Math.PI-0.1); ctx.stroke();
+
+  // Body
+  ctx.beginPath(); ctx.moveTo(x, y-12); ctx.lineTo(x, y-2); ctx.stroke();
+
+  // Arms
+  const armSwing = walk ? Math.sin(f * 0.2) * 6 : 0;
+  ctx.beginPath(); ctx.moveTo(x, y-10); ctx.lineTo(x-7, y-4+armSwing); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x, y-10); ctx.lineTo(x+7, y-4-armSwing); ctx.stroke();
+
+  // Legs
+  const legSwing = walk ? Math.sin(f * 0.2) * 5 : 0;
+  ctx.beginPath(); ctx.moveTo(x, y-2); ctx.lineTo(x-5, y+8+legSwing); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x, y-2); ctx.lineTo(x+5, y+8-legSwing); ctx.stroke();
+
+  // Random hat
+  const hatType = Math.floor(rng() * 4);
+  if (hatType === 0) {
+    ctx.beginPath(); ctx.moveTo(x-5,y-20); ctx.lineTo(x,y-26); ctx.lineTo(x+5,y-20); ctx.stroke();
+  } else if (hatType === 1) {
+    ctx.beginPath(); ctx.moveTo(x-6,y-20); ctx.lineTo(x+6,y-20); ctx.stroke();
+    ctx.fillRect(x-3, y-24, 6, 4);
+  }
+
+  ctx.restore();
+}
+
+// ===== SECTION F: ECONOMY & PROGRESSION =====
+
+function addCoins(n) {
+  G.coins += n;
+  if (n > 0) floatingTexts.push({text:'+'+n+' coins', x:W/2, y:80, color:'#b8860b', life:1.5, age:0, screen:true});
+}
+
+function addXP(n) {
+  G.xp += n;
+  floatingTexts.push({text:'+'+n+' XP', x:W/2+40, y:80, color:'#4488cc', life:1.2, age:0, screen:true});
+  checkLevelUp();
+}
+
+function checkLevelUp() {
+  const next = LEVEL_TABLE.find(l => l.lvl === G.level + 1);
+  if (next && G.xp >= next.xp) {
+    G.level = next.lvl;
+    next.unlocks.forEach(u => G.unlocked.add(u));
+    showDialog('Level Up!', 'You reached Level ' + G.level + '!' +
+      (next.unlocks.length ? '\n\nNew unlocks:\n' + next.unlocks.map(u => {
+        const bd = BUILDING_DEFS[u]; const cd = CROP_DEFS[u];
+        return bd ? bd.icon + ' ' + bd.name : cd ? cd.icon + ' ' + cd.name : u;
+      }).join('\n') : ''));
+    checkLevelUp();
+  }
+}
+
+function canAfford(cost) { return G.coins >= cost; }
+function spendCoins(cost) { G.coins -= cost; }
+
+function addToInventory(item, qty) {
+  if (G.storageUsed + qty > G.storageCap) {
+    showDialog('Storage Full', 'Your barn is full! Build more barns for storage.');
+    return false;
+  }
+  G.inventory[item] = (G.inventory[item] || 0) + qty;
+  recalcStorage();
+  return true;
+}
+
+function removeFromInventory(item, qty) {
+  if ((G.inventory[item] || 0) < qty) return false;
+  G.inventory[item] -= qty;
+  if (G.inventory[item] <= 0) delete G.inventory[item];
+  recalcStorage();
+  return true;
+}
+
+function hasItems(inputs) {
+  for (const k in inputs) {
+    if ((G.inventory[k] || 0) < inputs[k]) return false;
+  }
+  return true;
+}
+
+// ===== SECTION G: INPUT HANDLING =====
+
+const input = {
+  down: false, dragging: false,
+  startX: 0, startY: 0, lastX: 0, lastY: 0,
+  pinching: false, pinchDist: 0, pinchZoom: 1,
+  mode: 'select', placingType: null, placingCrop: null,
+  selected: null,
+  hoverGX: -1, hoverGY: -1,
+};
+
+function onPointerDown(sx, sy) {
+  input.down = true; input.dragging = false;
+  input.startX = sx; input.startY = sy;
+  input.lastX = sx; input.lastY = sy;
+}
+
+function onPointerMove(sx, sy) {
+  const grid = screenToGrid(sx, sy);
+  input.hoverGX = grid.gx; input.hoverGY = grid.gy;
+
+  if (!input.down) return;
+  const dx = sx - input.startX, dy = sy - input.startY;
+  if (!input.dragging && Math.sqrt(dx*dx+dy*dy) > 10) input.dragging = true;
+  if (input.dragging) {
+    G.camera.x -= (sx - input.lastX) / G.camera.zoom;
+    G.camera.y -= (sy - input.lastY) / G.camera.zoom;
+  }
+  input.lastX = sx; input.lastY = sy;
+}
+
+function onPointerUp(sx, sy) {
+  if (!input.dragging) handleTap(sx, sy);
+  input.down = false; input.dragging = false;
+}
+
+function isGameArea(e) { return e.target === canvas || e.target === document.body || e.target === document.documentElement; }
+document.addEventListener('mousedown', e => { if(isGameArea(e)) onPointerDown(e.clientX, e.clientY); });
+document.addEventListener('mousemove', e => { if(input.down) onPointerMove(e.clientX, e.clientY); });
+document.addEventListener('mouseup', e => { if(input.down) onPointerUp(e.clientX, e.clientY); });
+document.addEventListener('wheel', e => {
+  if (e.target.closest('#toolbar,.panel,#info-panel,#dialog-overlay,#hud-top')) return;
+  e.preventDefault();
+  const zoomDelta = e.deltaY > 0 ? 0.9 : 1.1;
+  G.camera.zoom = Math.max(0.4, Math.min(2.5, G.camera.zoom * zoomDelta));
+}, {passive:false});
+
+document.addEventListener('touchstart', e => {
+  if (!isGameArea(e)) return;
+  e.preventDefault();
+  if (e.touches.length === 2) {
+    input.pinching = true;
+    const dx = e.touches[0].clientX - e.touches[1].clientX;
+    const dy = e.touches[0].clientY - e.touches[1].clientY;
+    input.pinchDist = Math.sqrt(dx*dx+dy*dy);
+    input.pinchZoom = G.camera.zoom;
+  } else {
+    const t = e.touches[0];
+    onPointerDown(t.clientX, t.clientY);
+  }
+}, {passive:false});
+
+document.addEventListener('touchmove', e => {
+  if (!isGameArea(e)) return;
+  e.preventDefault();
+  if (input.pinching && e.touches.length === 2) {
+    const dx = e.touches[0].clientX - e.touches[1].clientX;
+    const dy = e.touches[0].clientY - e.touches[1].clientY;
+    const dist = Math.sqrt(dx*dx+dy*dy);
+    G.camera.zoom = Math.max(0.4, Math.min(2.5, input.pinchZoom * (dist/input.pinchDist)));
+  } else if (e.touches.length === 1) {
+    onPointerMove(e.touches[0].clientX, e.touches[0].clientY);
+  }
+}, {passive:false});
+
+document.addEventListener('touchend', e => {
+  if (input.pinching) { input.pinching = false; return; }
+  if (e.changedTouches.length) {
+    const t = e.changedTouches[0];
+    onPointerUp(t.clientX, t.clientY);
+  }
+});
+
+function handleTap(sx, sy) {
+  // Check if tapping on HUD area
+  if (sy < 40 || sy > H - 60) return;
+
+  const grid = screenToGrid(sx, sy);
+  const gx = grid.gx, gy = grid.gy;
+  if (gx < 0 || gy < 0 || gx >= GRID_W || gy >= GRID_H) return;
+
+  switch (input.mode) {
+    case 'select': selectAt(gx, gy); break;
+    case 'place': placeAt(gx, gy); break;
+    case 'plant': plantAt(gx, gy); break;
+    case 'bulldoze': bulldozeAt(gx, gy); break;
+  }
+}
+
+function selectAt(gx, gy) {
+  hideInfoPanel();
+  const tile = G.tiles[gy][gx];
+  if (tile.type === 'empty') { input.selected = null; return; }
+
+  const ent = tile.entityId;
+  if (tile.type === 'field') {
+    const crop = G.crops.find(c => c.gridX === gx && c.gridY === gy);
+    if (crop) showCropInfo(crop);
+    else showFieldInfo(gx, gy);
+  } else if (tile.type === 'building') {
+    const b = G.buildings.find(b => b.id === ent);
+    if (b) showBuildingInfo(b);
+  }
+}
+
+function placeAt(gx, gy) {
+  if (!input.placingType) return;
+  const def = BUILDING_DEFS[input.placingType];
+  if (!def) return;
+  const sz = def.size;
+
+  // Check all tiles are empty and in bounds
+  for (let dy = 0; dy < sz[1]; dy++) {
+    for (let dx = 0; dx < sz[0]; dx++) {
+      const tx = gx+dx, ty = gy+dy;
+      if (tx >= GRID_W || ty >= GRID_H) { showDialog('Oops', 'Not enough space here!'); return; }
+      if (G.tiles[ty][tx].type !== 'empty') { showDialog('Oops', 'This spot is occupied!'); return; }
+    }
+  }
+
+  if (!canAfford(def.cost)) { showDialog('Not enough coins', 'You need ' + def.cost + ' coins.'); return; }
+
+  spendCoins(def.cost);
+  const b = { id: uid(), type: input.placingType, gridX: gx, gridY: gy };
+  if (['bakery','dairy','juice'].includes(b.type)) {
+    b.recipe = null; b.prodStart = null; b.prodDone = false;
+  }
+  G.buildings.push(b);
+
+  for (let dy = 0; dy < sz[1]; dy++) {
+    for (let dx = 0; dx < sz[0]; dx++) {
+      const tile = G.tiles[gy+dy][gx+dx];
+      tile.type = b.type === 'field' ? 'field' : 'building';
+      tile.entityId = b.id;
+    }
+  }
+
+  addXP(def.xp);
+  recalcPop();
+  spawnStickmen();
+
+  // Tutorial advancement
+  if (!G.tutDone) {
+    if (G.tutStep === 1 && input.placingType === 'field') { G.tutStep = 2; showTutorial(); }
+    else if (G.tutStep === 3 && input.placingType === 'house_s') { G.tutStep = 4; showTutorial(); }
+  }
+
+  clearSpriteCache();
+}
+
+function plantAt(gx, gy) {
+  if (!input.placingCrop) return;
+  const tile = G.tiles[gy][gx];
+  if (tile.type !== 'field') { showDialog('Oops', 'You can only plant on farm fields!'); return; }
+  const existing = G.crops.find(c => c.gridX === gx && c.gridY === gy);
+  if (existing) { showDialog('Oops', 'There is already a crop here!'); return; }
+
+  const crop = {
+    id: uid(), type: input.placingCrop,
+    gridX: gx, gridY: gy,
+    plantedAt: Date.now(), stage: 0,
+    watered: false, wateredAt: null
+  };
+  G.crops.push(crop);
+  addXP(1);
+
+  if (!G.tutDone && G.tutStep === 2) { G.tutStep = 3; showTutorial(); }
+  clearSpriteCache();
+}
+
+function bulldozeAt(gx, gy) {
+  const tile = G.tiles[gy][gx];
+  if (tile.type === 'empty') return;
+
+  // Remove crop if any
+  const ci = G.crops.findIndex(c => c.gridX === gx && c.gridY === gy);
+  if (ci >= 0) { G.crops.splice(ci, 1); }
+
+  // Find and remove building
+  if (tile.entityId) {
+    const bi = G.buildings.findIndex(b => b.id === tile.entityId);
+    if (bi >= 0) {
+      const b = G.buildings[bi];
+      const def = BUILDING_DEFS[b.type];
+      const sz = def.size;
+      // Clear all tiles
+      for (let dy = 0; dy < sz[1]; dy++) {
+        for (let dx = 0; dx < sz[0]; dx++) {
+          if (b.gridY+dy < GRID_H && b.gridX+dx < GRID_W) {
+            G.tiles[b.gridY+dy][b.gridX+dx] = {type:'empty', entityId:null};
+          }
+        }
+      }
+      // Remove crops on those tiles
+      G.crops = G.crops.filter(c => {
+        for (let dy = 0; dy < sz[1]; dy++)
+          for (let dx = 0; dx < sz[0]; dx++)
+            if (c.gridX === b.gridX+dx && c.gridY === b.gridY+dy) return false;
+        return true;
+      });
+      G.buildings.splice(bi, 1);
+      addCoins(Math.floor(def.cost * 0.3));
+      recalcPop();
+    }
+  } else {
+    tile.type = 'empty'; tile.entityId = null;
+  }
+  clearSpriteCache();
+}
+
+// ===== SECTION H: UI SYSTEM =====
+
+const floatingTexts = [];
+let activePanel = null;
+let spriteCache = {};
+
+function clearSpriteCache() { spriteCache = {}; }
+
+function updateHUD() {
+  document.getElementById('hud-coins').textContent = G.coins;
+  document.getElementById('hud-level').textContent = G.level;
+  document.getElementById('hud-pop').textContent = G.pop;
+  document.getElementById('hud-maxpop').textContent = G.maxPop;
+  document.getElementById('hud-storage').textContent = G.storageUsed;
+  document.getElementById('hud-storecap').textContent = G.storageCap;
+
+  const next = LEVEL_TABLE.find(l => l.lvl === G.level + 1);
+  const prev = LEVEL_TABLE.find(l => l.lvl === G.level) || {xp:0};
+  if (next) {
+    const pct = ((G.xp - prev.xp) / (next.xp - prev.xp)) * 100;
+    document.getElementById('hud-xp-fill').style.width = Math.min(100, pct) + '%';
+  } else {
+    document.getElementById('hud-xp-fill').style.width = '100%';
+  }
+}
+
+function showPanel(id) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('show'));
+  hideInfoPanel();
+  if (activePanel === id) { activePanel = null; clearToolbarActive(); return; }
+  activePanel = id;
+  document.getElementById(id).classList.add('show');
+}
+
+function hideAllPanels() {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('show'));
+  activePanel = null;
+  clearToolbarActive();
+}
+
+function clearToolbarActive() {
+  document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+}
+
+function setToolbarActive(action) {
+  clearToolbarActive();
+  document.querySelector(`.tool-btn[data-action="${action}"]`)?.classList.add('active');
+}
+
+// Toolbar buttons
+window.toolAction = function(action) {
+  input.mode = 'select';
+  input.placingType = null;
+  input.placingCrop = null;
+
+  switch(action) {
+    case 'build':
+      setToolbarActive('build');
+      populateBuildPanel();
+      showPanel('build-panel');
+      break;
+    case 'farm':
+      setToolbarActive('farm');
+      populateFarmPanel();
+      showPanel('farm-panel');
+      break;
+    case 'factory':
+      setToolbarActive('factory');
+      populateFactoryPanel();
+      showPanel('factory-panel');
+      break;
+    case 'market':
+      setToolbarActive('market');
+      populateMarketPanel();
+      showPanel('market-panel');
+      break;
+    case 'bulldoze':
+      if (input.mode === 'bulldoze') {
+        input.mode = 'select';
+        clearToolbarActive();
+      } else {
+        input.mode = 'bulldoze';
+        setToolbarActive('bulldoze');
+        hideAllPanels();
+        setToolbarActive('bulldoze');
+      }
+      break;
+  }
+};
+
+function populateBuildPanel() {
+  const cont = document.getElementById('build-items');
+  cont.innerHTML = '';
+  for (const [key, def] of Object.entries(BUILDING_DEFS)) {
+    if (def.cat === 'farming') continue; // fields go in farm panel
+    if (def.cat === 'factory') continue; // factories in factory panel
+    const locked = !G.unlocked.has(key);
+    const card = document.createElement('div');
+    card.className = 'item-card' + (locked ? ' locked' : '');
+    card.innerHTML = `<div class="item-icon">${def.icon}</div><div class="item-name">${def.name}</div><div class="item-cost">${locked ? 'Lvl '+def.unlockLvl : def.cost+' coins'}</div>`;
+    if (!locked) {
+      card.addEventListener('click', () => {
+        input.mode = 'place';
+        input.placingType = key;
+        hideAllPanels();
+        setToolbarActive('build');
+      });
+    }
+    cont.appendChild(card);
+  }
+}
+
+function populateFarmPanel() {
+  const cont = document.getElementById('farm-items');
+  cont.innerHTML = '';
+
+  // Field option
+  const fieldDef = BUILDING_DEFS.field;
+  const fieldCard = document.createElement('div');
+  fieldCard.className = 'item-card';
+  fieldCard.innerHTML = `<div class="item-icon">${fieldDef.icon}</div><div class="item-name">Field</div><div class="item-cost">${fieldDef.cost} coins</div>`;
+  fieldCard.addEventListener('click', () => {
+    input.mode = 'place';
+    input.placingType = 'field';
+    hideAllPanels();
+    setToolbarActive('farm');
+  });
+  cont.appendChild(fieldCard);
+
+  // Crops
+  for (const [key, def] of Object.entries(CROP_DEFS)) {
+    const locked = !G.unlocked.has(key);
+    const card = document.createElement('div');
+    card.className = 'item-card' + (locked ? ' locked' : '');
+    card.innerHTML = `<div class="item-icon">${def.icon}</div><div class="item-name">${def.name}</div><div class="item-cost">${locked ? 'Lvl '+def.unlockLvl : def.growTime+'s'}</div>`;
+    if (!locked) {
+      card.addEventListener('click', () => {
+        input.mode = 'plant';
+        input.placingCrop = key;
+        hideAllPanels();
+        setToolbarActive('farm');
+      });
+    }
+    cont.appendChild(card);
+  }
+}
+
+function populateFactoryPanel() {
+  const cont = document.getElementById('factory-items');
+  cont.innerHTML = '';
+  for (const [key, def] of Object.entries(BUILDING_DEFS)) {
+    if (def.cat !== 'factory') continue;
+    const locked = !G.unlocked.has(key);
+    const card = document.createElement('div');
+    card.className = 'item-card' + (locked ? ' locked' : '');
+    card.innerHTML = `<div class="item-icon">${def.icon}</div><div class="item-name">${def.name}</div><div class="item-cost">${locked ? 'Lvl '+def.unlockLvl : def.cost+' coins'}</div>`;
+    if (!locked) {
+      card.addEventListener('click', () => {
+        input.mode = 'place';
+        input.placingType = key;
+        hideAllPanels();
+        setToolbarActive('factory');
+      });
+    }
+    cont.appendChild(card);
+  }
+}
+
+function populateMarketPanel() {
+  const cont = document.getElementById('market-items');
+  cont.innerHTML = '';
+
+  // Check if market is built
+  const hasMarket = G.buildings.some(b => b.type === 'market');
+  if (!hasMarket) {
+    cont.innerHTML = '<p style="text-align:center;padding:12px;font-size:12px">Build a Market first to sell goods!</p>';
+    return;
+  }
+
+  // Sell raw crops
+  for (const [key, def] of Object.entries(CROP_DEFS)) {
+    const qty = G.inventory[key] || 0;
+    if (qty <= 0) continue;
+    const card = document.createElement('div');
+    card.className = 'item-card';
+    card.innerHTML = `<div class="item-icon">${def.icon}</div><div class="item-name">${def.name} x${qty}</div><div class="item-cost">${def.sell} ea</div>`;
+    card.addEventListener('click', () => {
+      if (removeFromInventory(key, 1)) {
+        addCoins(def.sell);
+        addXP(1);
+        populateMarketPanel();
+      }
+    });
+    cont.appendChild(card);
+  }
+
+  // Sell processed goods
+  for (const [key, info] of Object.entries(GOODS_INFO)) {
+    const qty = G.inventory[key] || 0;
+    if (qty <= 0) continue;
+    const card = document.createElement('div');
+    card.className = 'item-card';
+    card.innerHTML = `<div class="item-icon">${info.icon}</div><div class="item-name">${info.name} x${qty}</div><div class="item-cost">${info.sell} ea</div>`;
+    card.addEventListener('click', () => {
+      if (removeFromInventory(key, 1)) {
+        addCoins(info.sell);
+        addXP(2);
+        populateMarketPanel();
+      }
+    });
+    cont.appendChild(card);
+  }
+
+  if (cont.children.length === 0) {
+    cont.innerHTML = '<p style="text-align:center;padding:12px;font-size:12px">Nothing to sell! Harvest crops first.</p>';
+  }
+}
+
+// Info panel
+function showInfoPanel(title, bodyHTML) {
+  document.getElementById('info-title').textContent = title;
+  document.getElementById('info-body').innerHTML = bodyHTML;
+  document.getElementById('info-panel').classList.add('show');
+}
+
+function hideInfoPanel() {
+  document.getElementById('info-panel').classList.remove('show');
+}
+
+function showCropInfo(crop) {
+  const def = CROP_DEFS[crop.type];
+  const elapsed = (Date.now() - crop.plantedAt) / 1000;
+  const speed = crop.watered ? 2 : 1;
+  const progress = Math.min(1, (elapsed * speed) / def.growTime);
+  const ready = progress >= 1;
+  const timeLeft = ready ? 0 : Math.ceil((def.growTime - elapsed * speed) / speed);
+
+  let html = `<p>${def.icon} ${def.name}</p>`;
+  html += `<div class="progress-bar"><div class="progress-fill" style="width:${Math.floor(progress*100)}%;background:${ready?'#6aaa4a':'#6b9edd'}"></div></div>`;
+
+  if (ready) {
+    html += `<button onclick="harvestCrop(${crop.id})">Harvest!</button>`;
+  } else {
+    html += `<p>${timeLeft}s remaining</p>`;
+    if (!crop.watered) {
+      html += `<button onclick="waterCrop(${crop.id})">Water (2x speed)</button>`;
+    } else {
+      html += `<p>Watered!</p>`;
+    }
+  }
+  html += `<button onclick="hideInfoPanel()" style="margin-top:4px">Close</button>`;
+  showInfoPanel(def.name, html);
+}
+
+function showFieldInfo(gx, gy) {
+  let html = '<p>Empty field - select a crop to plant!</p>';
+  html += `<button onclick="hideInfoPanel()">Close</button>`;
+  showInfoPanel('Farm Field', html);
+}
+
+function showBuildingInfo(b) {
+  const def = BUILDING_DEFS[b.type];
+  let html = `<p>${def.icon} ${def.name}</p>`;
+
+  if (['bakery','dairy','juice'].includes(b.type)) {
+    const recipes = FACTORY_RECIPES[b.type];
+    if (b.prodDone) {
+      const recipe = recipes[b.recipe];
+      html += `<p>${recipe.icon} ${recipe.name} is ready!</p>`;
+      html += `<button onclick="collectFactory(${b.id})">Collect</button>`;
+    } else if (b.prodStart != null) {
+      const recipe = recipes[b.recipe];
+      const elapsed = (Date.now() - b.prodStart) / 1000;
+      const pct = Math.min(100, Math.floor((elapsed / recipe.time) * 100));
+      const left = Math.max(0, Math.ceil(recipe.time - elapsed));
+      html += `<p>Making ${recipe.name}... ${left}s</p>`;
+      html += `<div class="progress-bar"><div class="progress-fill" style="width:${pct}%;background:#6b9edd"></div></div>`;
+    } else {
+      html += '<div class="recipe-list">';
+      recipes.forEach((r, i) => {
+        const canMake = hasItems(r.inputs);
+        const inputStr = Object.entries(r.inputs).map(([k,v]) => {
+          const cd = CROP_DEFS[k]; return (cd?cd.icon:k) + 'x' + v;
+        }).join(' + ');
+        html += `<button class="recipe-btn" ${canMake?'':'disabled'} onclick="startFactory(${b.id},${i})">${r.icon} ${r.name}<br><small>${inputStr}</small></button>`;
+      });
+      html += '</div>';
+    }
+  } else if (def.popAdd) {
+    html += `<p>Population: +${def.popAdd}</p>`;
+  } else if (def.storageAdd) {
+    html += `<p>Storage: +${def.storageAdd}</p>`;
+  }
+
+  html += `<button onclick="hideInfoPanel()" style="margin-top:4px">Close</button>`;
+  showInfoPanel(def.name, html);
+}
+
+// Global functions called from inline onclick
+window.harvestCrop = function(cropId) {
+  const ci = G.crops.findIndex(c => c.id === cropId);
+  if (ci < 0) return;
+  const crop = G.crops[ci];
+  const def = CROP_DEFS[crop.type];
+
+  if (addToInventory(crop.type, 1)) {
+    G.crops.splice(ci, 1);
+    addXP(def.xp);
+    const pos = gridToScreen(crop.gridX, crop.gridY);
+    floatingTexts.push({text: def.icon + ' +1', x: pos.x, y: pos.y - 20, color: '#3a7a1a', life: 1.5, age: 0});
+    hideInfoPanel();
+    clearSpriteCache();
+  }
+};
+
+window.waterCrop = function(cropId) {
+  const crop = G.crops.find(c => c.id === cropId);
+  if (!crop) return;
+  // Check for well
+  const hasWell = G.buildings.some(b => b.type === 'well');
+  if (!hasWell) {
+    showDialog('No Well', 'Build a Well to water your crops!');
+    return;
+  }
+  crop.watered = true;
+  crop.wateredAt = Date.now();
+  hideInfoPanel();
+  clearSpriteCache();
+};
+
+window.startFactory = function(bId, recipeIdx) {
+  const b = G.buildings.find(b => b.id === bId);
+  if (!b) return;
+  const recipes = FACTORY_RECIPES[b.type];
+  const recipe = recipes[recipeIdx];
+  if (!hasItems(recipe.inputs)) { showDialog('Missing Items', 'Not enough ingredients!'); return; }
+  for (const k in recipe.inputs) removeFromInventory(k, recipe.inputs[k]);
+  b.recipe = recipeIdx;
+  b.prodStart = Date.now();
+  b.prodDone = false;
+  hideInfoPanel();
+};
+
+window.collectFactory = function(bId) {
+  const b = G.buildings.find(b => b.id === bId);
+  if (!b || !b.prodDone) return;
+  const recipes = FACTORY_RECIPES[b.type];
+  const recipe = recipes[b.recipe];
+  if (addToInventory(recipe.out, recipe.qty)) {
+    addXP(3);
+    addCoins(2);
+    b.recipe = null; b.prodStart = null; b.prodDone = false;
+    hideInfoPanel();
+  }
+};
+
+// Dialog
+function showDialog(title, body) {
+  document.getElementById('dialog-title').textContent = title;
+  document.getElementById('dialog-body').textContent = body;
+  document.getElementById('dialog-overlay').classList.remove('hidden');
+}
+
+document.getElementById('dialog-ok').addEventListener('click', () => {
+  document.getElementById('dialog-overlay').classList.add('hidden');
+});
+
+// ===== SECTION I: SAVE/LOAD =====
+
+function saveGame() {
+  try {
+    const data = {
+      v: 1, t: Date.now(),
+      coins: G.coins, xp: G.xp, level: G.level,
+      inv: G.inventory,
+      buildings: G.buildings.map(b => ({id:b.id, type:b.type, gx:b.gridX, gy:b.gridY, recipe:b.recipe, ps:b.prodStart, pd:b.prodDone})),
+      crops: G.crops.map(c => ({id:c.id, type:c.type, gx:c.gridX, gy:c.gridY, pa:c.plantedAt, w:c.watered, wa:c.wateredAt})),
+      tutDone: G.tutDone, tutStep: G.tutStep,
+      cam: G.camera, uid: _uid,
+    };
+    localStorage.setItem('sticktown_save', JSON.stringify(data));
+    G.lastSave = Date.now();
+  } catch(e) {}
+}
+
+function loadGame() {
+  try {
+    const raw = localStorage.getItem('sticktown_save');
+    if (!raw) return false;
+    const d = JSON.parse(raw);
+    G.coins = d.coins; G.xp = d.xp; G.level = d.level;
+    G.inventory = d.inv || {};
+    G.tutDone = d.tutDone; G.tutStep = d.tutStep;
+    G.camera = d.cam || {x:0,y:0,zoom:1};
+    _uid = d.uid || 1;
+
+    initTiles();
+    G.buildings = [];
+    G.crops = [];
+
+    for (const b of d.buildings) {
+      const building = {id:b.id, type:b.type, gridX:b.gx, gridY:b.gy};
+      if (['bakery','dairy','juice'].includes(b.type)) {
+        building.recipe = b.recipe; building.prodStart = b.ps; building.prodDone = b.pd || false;
+        // Check if production completed while offline
+        if (building.prodStart && !building.prodDone && building.recipe != null) {
+          const recipes = FACTORY_RECIPES[b.type];
+          const recipe = recipes[building.recipe];
+          if ((Date.now() - building.prodStart)/1000 >= recipe.time) building.prodDone = true;
+        }
+      }
+      G.buildings.push(building);
+      const def = BUILDING_DEFS[b.type];
+      if (def) {
+        const sz = def.size;
+        for (let dy = 0; dy < sz[1]; dy++)
+          for (let dx = 0; dx < sz[0]; dx++)
+            if (b.gy+dy < GRID_H && b.gx+dx < GRID_W) {
+              G.tiles[b.gy+dy][b.gx+dx] = {type: b.type==='field'?'field':'building', entityId: b.id};
+            }
+      }
+    }
+
+    for (const c of d.crops) {
+      G.crops.push({id:c.id, type:c.type, gridX:c.gx, gridY:c.gy, plantedAt:c.pa, stage:0, watered:c.w, wateredAt:c.wa});
+    }
+
+    initUnlocks();
+    recalcPop();
+    spawnStickmen();
+    return true;
+  } catch(e) { return false; }
+}
+
+window.addEventListener('beforeunload', saveGame);
+document.addEventListener('visibilitychange', () => { if (document.hidden) saveGame(); });
+
+// ===== SECTION J: STICKMAN AI =====
+
+function spawnStickmen() {
+  const target = Math.min(Math.floor(G.maxPop / 4), 15);
+  while (G.stickmen.length < target) {
+    const center = gridToScreen(GRID_W/2, GRID_H/2);
+    const s = {
+      id: uid(), seed: Math.floor(Math.random()*99999),
+      x: center.x + (Math.random()-.5)*100,
+      y: center.y + (Math.random()-.5)*60,
+      tx: 0, ty: 0,
+      state: 'idle', idleTime: Math.random()*3,
+      animFrame: 0, dir: 'right'
+    };
+    G.stickmen.push(s);
+  }
+  while (G.stickmen.length > target && G.stickmen.length > 0) {
+    G.stickmen.pop();
+  }
+  G.pop = Math.min(G.stickmen.length * 4, G.maxPop);
+}
+
+function updateStickmen(dt) {
+  for (const s of G.stickmen) {
+    if (s.state === 'idle') {
+      s.idleTime -= dt;
+      if (s.idleTime <= 0) {
+        // Pick random nearby target
+        const angle = Math.random() * Math.PI * 2;
+        const dist = 30 + Math.random() * 80;
+        s.tx = s.x + Math.cos(angle) * dist;
+        s.ty = s.y + Math.sin(angle) * dist;
+        // Clamp to grid area
+        const minS = gridToScreen(0, 0);
+        const maxS = gridToScreen(GRID_W, GRID_H);
+        s.tx = Math.max(minS.x - 50, Math.min(maxS.x + 50, s.tx));
+        s.ty = Math.max(minS.y - 30, Math.min(maxS.y + 30, s.ty));
+        s.state = 'walk';
+      }
+    } else if (s.state === 'walk') {
+      const dx = s.tx - s.x, dy = s.ty - s.y;
+      const dist = Math.sqrt(dx*dx + dy*dy);
+      if (dist < 3) {
+        s.state = 'idle';
+        s.idleTime = 1.5 + Math.random() * 4;
+      } else {
+        const speed = 25;
+        s.x += (dx/dist) * speed * dt;
+        s.y += (dy/dist) * speed * dt;
+        s.dir = dx > 0 ? 'right' : 'left';
+        s.animFrame++;
+      }
+    }
+  }
+}
+
+// ===== SECTION K: GAME LOOP =====
+
+let lastTime = 0;
+
+function update(dt, now) {
+  // Update crops
+  for (const crop of G.crops) {
+    const def = CROP_DEFS[crop.type];
+    const elapsed = (now - crop.plantedAt) / 1000;
+    const speed = crop.watered ? 2 : 1;
+    crop.stage = Math.min(3, Math.floor((elapsed * speed) / (def.growTime / 4)));
+    // Watering expires after 2 minutes
+    if (crop.watered && crop.wateredAt && now - crop.wateredAt > 120000) {
+      crop.watered = false;
+    }
+  }
+
+  // Update factories
+  for (const b of G.buildings) {
+    if (['bakery','dairy','juice'].includes(b.type) && b.prodStart && !b.prodDone && b.recipe != null) {
+      const recipes = FACTORY_RECIPES[b.type];
+      const recipe = recipes[b.recipe];
+      if ((now - b.prodStart)/1000 >= recipe.time) {
+        b.prodDone = true;
+      }
+    }
+  }
+
+  updateStickmen(dt);
+
+  // Auto save
+  if (now - G.lastSave > 30000) saveGame();
+}
+
+function drawPaperBG() {
+  ctx.fillStyle = COLORS.paper;
+  ctx.fillRect(0, 0, W, H);
+
+  // Notebook lines
+  ctx.strokeStyle = 'rgba(100,140,200,0.12)';
+  ctx.lineWidth = 0.5;
+  for (let y = 24; y < H; y += 24) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+  }
+  // Red margin
+  ctx.strokeStyle = 'rgba(200,80,80,0.15)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(60, 0); ctx.lineTo(60, H); ctx.stroke();
+}
+
+function render(dt) {
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  drawPaperBG();
+
+  applyCamera();
+
+  // Draw all tiles
+  for (let gy = 0; gy < GRID_H; gy++) {
+    for (let gx = 0; gx < GRID_W; gx++) {
+      const s = gridToScreen(gx, gy);
+      const tile = G.tiles[gy][gx];
+      const seed = gx * 1000 + gy;
+
+      if (tile.type === 'field') {
+        drawFieldTile(ctx, s.x, s.y, seed);
+        const crop = G.crops.find(c => c.gridX === gx && c.gridY === gy);
+        if (crop) drawCropOnField(ctx, s.x, s.y, crop);
+      } else if (tile.type === 'empty') {
+        drawGrassTile(ctx, s.x, s.y, seed);
+      }
+      // Buildings drawn separately for correct layering
+    }
+  }
+
+  // Sort buildings by Y for depth
+  const sortedBuildings = [...G.buildings].sort((a, b) => {
+    const sa = BUILDING_DEFS[a.type].size;
+    const sb = BUILDING_DEFS[b.type].size;
+    return (a.gridY + sa[1]) - (b.gridY + sb[1]) || (a.gridX + sa[0]) - (b.gridX + sb[0]);
+  });
+
+  for (const b of sortedBuildings) {
+    if (b.type !== 'field') drawBuilding(ctx, b);
+  }
+
+  // Draw stickmen sorted by Y
+  const sortedStick = [...G.stickmen].sort((a,b) => a.y - b.y);
+  for (const s of sortedStick) drawStickman(ctx, s);
+
+  // Placement preview
+  if ((input.mode === 'place' || input.mode === 'plant') && input.hoverGX >= 0 && input.hoverGY >= 0) {
+    const gx = input.hoverGX, gy = input.hoverGY;
+    const s = gridToScreen(gx, gy);
+    ctx.globalAlpha = 0.4;
+    const pts = [[s.x, s.y-TILE_H/2],[s.x+TILE_W/2, s.y],[s.x, s.y+TILE_H/2],[s.x-TILE_W/2, s.y]];
+    ctx.fillStyle = '#ffe599';
+    ctx.beginPath();
+    pts.forEach((p,i) => i===0 ? ctx.moveTo(p[0],p[1]) : ctx.lineTo(p[0],p[1]));
+    ctx.closePath(); ctx.fill();
+    ctx.globalAlpha = 1;
+
+    // Size preview for multi-tile buildings
+    if (input.mode === 'place' && input.placingType) {
+      const def = BUILDING_DEFS[input.placingType];
+      if (def && (def.size[0] > 1 || def.size[1] > 1)) {
+        for (let dy = 0; dy < def.size[1]; dy++) {
+          for (let dx = 0; dx < def.size[0]; dx++) {
+            if (dx === 0 && dy === 0) continue;
+            const ts = gridToScreen(gx+dx, gy+dy);
+            ctx.globalAlpha = 0.25;
+            ctx.fillStyle = '#ffe599';
+            ctx.beginPath();
+            const tpts = [[ts.x, ts.y-TILE_H/2],[ts.x+TILE_W/2, ts.y],[ts.x, ts.y+TILE_H/2],[ts.x-TILE_W/2, ts.y]];
+            tpts.forEach((p,i) => i===0 ? ctx.moveTo(p[0],p[1]) : ctx.lineTo(p[0],p[1]));
+            ctx.closePath(); ctx.fill();
+            ctx.globalAlpha = 1;
+          }
+        }
+      }
+    }
+  }
+
+  // Selection highlight
+  if (input.selected) {
+    const s = gridToScreen(input.selected.gx, input.selected.gy);
+    ctx.strokeStyle = '#ff9900';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([4,3]);
+    const pts = [[s.x, s.y-TILE_H/2],[s.x+TILE_W/2, s.y],[s.x, s.y+TILE_H/2],[s.x-TILE_W/2, s.y]];
+    ctx.beginPath();
+    pts.forEach((p,i) => i===0 ? ctx.moveTo(p[0],p[1]) : ctx.lineTo(p[0],p[1]));
+    ctx.closePath(); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  restoreCamera();
+
+  // Floating texts
+  for (let i = floatingTexts.length - 1; i >= 0; i--) {
+    const ft = floatingTexts[i];
+    ft.age += dt;
+    if (ft.age >= ft.life) { floatingTexts.splice(i, 1); continue; }
+    const alpha = 1 - ft.age / ft.life;
+    const yOff = ft.age * 30;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.font = 'bold 14px "Comic Sans MS", cursive';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = ft.color;
+    if (ft.screen) {
+      ctx.fillText(ft.text, ft.x, ft.y - yOff);
+    } else {
+      const ws = worldToScreen(ft.x, ft.y - yOff);
+      ctx.fillText(ft.text, ws.x, ws.y);
+    }
+    ctx.restore();
+  }
+
+  // Mode indicator
+  if (input.mode !== 'select') {
+    ctx.save();
+    ctx.font = '12px "Comic Sans MS", cursive';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = 'rgba(44,44,44,0.7)';
+    let modeText = '';
+    if (input.mode === 'place') modeText = 'Tap to place ' + (BUILDING_DEFS[input.placingType]?.name || '');
+    else if (input.mode === 'plant') modeText = 'Tap a field to plant ' + (CROP_DEFS[input.placingCrop]?.name || '');
+    else if (input.mode === 'bulldoze') modeText = 'Tap to remove (30% refund)';
+    ctx.fillText(modeText, W/2, 52);
+    ctx.restore();
+  }
+
+  updateHUD();
+}
+
+function gameLoop(ts) {
+  const dt = Math.min((ts - lastTime) / 1000, 0.1);
+  lastTime = ts;
+
+  update(dt, Date.now());
+  render(dt);
+
+  requestAnimationFrame(gameLoop);
+}
+
+// ===== TUTORIAL =====
+
+const TUTORIALS = [
+  "Welcome to Stickman Township! Build your town on this notebook page. Let's start!",
+  "Tap 'Farm' below, select 'Field', then tap an empty tile to place it.",
+  "Great! Now tap 'Farm' again and select 'Wheat' to plant on your field.",
+  "Your wheat is growing! Now tap 'Build' and place a Small House for population.",
+  "Awesome! Build a Well to water your crops and a Barn for storage. Have fun building your town!"
+];
+
+function showTutorial() {
+  if (G.tutDone) return;
+  if (G.tutStep >= TUTORIALS.length) { G.tutDone = true; return; }
+  showDialog('Tutorial', TUTORIALS[G.tutStep]);
+  if (G.tutStep >= TUTORIALS.length - 1) G.tutDone = true;
+}
+
+// ===== INITIALIZATION =====
+
+function init() {
+  const loaded = loadGame();
+  if (!loaded) {
+    initTiles();
+    initUnlocks();
+    // Center camera on grid
+    const center = gridToScreen(GRID_W/2, GRID_H/2);
+    G.camera.x = center.x;
+    G.camera.y = center.y;
+    showTutorial();
+  }
+
+  // Pause when hidden
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) lastTime = performance.now();
+  });
+
+  lastTime = performance.now();
+  requestAnimationFrame(gameLoop);
+}
+
+init();
+</script>
+</body>
+</html>
