@@ -179,7 +179,7 @@ const GOODS_INFO = {
 };
 
 const LEVEL_TABLE = [
-  { lvl:1, xp:0, unlocks:['field','house_s','barn','tree','well'] },
+  { lvl:1, xp:0, unlocks:['field','house_s','barn','tree','well','wheat'] },
   { lvl:2, xp:40, unlocks:['bench'] },
   { lvl:3, xp:120, unlocks:['corn','market'] },
   { lvl:4, xp:260, unlocks:['bakery'] },
@@ -850,8 +850,8 @@ document.addEventListener('touchend', e => {
 });
 
 function handleTap(sx, sy) {
-  // Check if tapping on HUD area
-  if (sy < 40 || sy > H - 70) return;
+  // Check if tapping on HUD area (top bar only; toolbar is outside game-area)
+  if (sy < 40) return;
 
   const grid = screenToGrid(sx, sy);
   const gx = grid.gx, gy = grid.gy;
