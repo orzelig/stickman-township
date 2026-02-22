@@ -63,6 +63,7 @@ canvas{display:block;position:absolute;top:0;left:0;z-index:0;pointer-events:non
   <span>&#11088; Lvl <span id="hud-level">1</span></span>
   <span>&#x1F464; <span id="hud-pop">0</span>/<span id="hud-maxpop">0</span></span>
   <span>&#x1F4E6; <span id="hud-storage">0</span>/<span id="hud-storecap">50</span></span>
+  <span id="hint-btn" onclick="showHint()" style="cursor:pointer;font-weight:bold;border:1.5px solid #2c2c2c;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:13px;-webkit-tap-highlight-color:transparent">i</span>
 </div>
 <div id="hud-xp-bar"><div id="hud-xp-fill" style="width:0%"></div></div>
 
@@ -775,6 +776,7 @@ const input = {
   mode: 'select', placingType: null, placingCrop: null,
   selected: null,
   hoverGX: -1, hoverGY: -1,
+  isTouch: false, touchTimer: null,
 };
 
 function onPointerDown(sx, sy) {
@@ -789,7 +791,8 @@ function onPointerMove(sx, sy) {
 
   if (!input.down) return;
   const dx = sx - input.startX, dy = sy - input.startY;
-  if (!input.dragging && Math.sqrt(dx*dx+dy*dy) > 10) input.dragging = true;
+  const dragThresh = input.isTouch ? 20 : 10;
+  if (!input.dragging && Math.sqrt(dx*dx+dy*dy) > dragThresh) input.dragging = true;
   if (input.dragging) {
     G.camera.x -= (sx - input.lastX) / G.camera.zoom;
     G.camera.y -= (sy - input.lastY) / G.camera.zoom;
@@ -802,10 +805,14 @@ function onPointerUp(sx, sy) {
   input.down = false; input.dragging = false;
 }
 
-function isGameArea(e) { const ga = document.getElementById('game-area'); return e.target === canvas || e.target === ga || e.target === document.body || e.target === document.documentElement; }
-document.addEventListener('mousedown', e => { if(isGameArea(e)) onPointerDown(e.clientX, e.clientY); });
-document.addEventListener('mousemove', e => { if(input.down) onPointerMove(e.clientX, e.clientY); });
-document.addEventListener('mouseup', e => { if(input.down) onPointerUp(e.clientX, e.clientY); });
+function isGameArea(e) {
+  if (e.target.closest('#toolbar,.panel,#info-panel,#dialog-overlay,#hud-top')) return false;
+  const ga = document.getElementById('game-area');
+  return ga.contains(e.target);
+}
+document.addEventListener('mousedown', e => { if(input.isTouch) return; if(isGameArea(e)) onPointerDown(e.clientX, e.clientY); });
+document.addEventListener('mousemove', e => { if(input.isTouch) return; if(input.down) onPointerMove(e.clientX, e.clientY); });
+document.addEventListener('mouseup', e => { if(input.isTouch) return; if(input.down) onPointerUp(e.clientX, e.clientY); });
 document.addEventListener('wheel', e => {
   if (e.target.closest('#toolbar,.panel,#info-panel,#dialog-overlay,#hud-top')) return;
   e.preventDefault();
@@ -816,6 +823,8 @@ document.addEventListener('wheel', e => {
 document.addEventListener('touchstart', e => {
   if (!isGameArea(e)) return;
   e.preventDefault();
+  input.isTouch = true;
+  if (input.touchTimer) clearTimeout(input.touchTimer);
   if (e.touches.length === 2) {
     input.pinching = true;
     const dx = e.touches[0].clientX - e.touches[1].clientX;
@@ -842,6 +851,8 @@ document.addEventListener('touchmove', e => {
 }, {passive:false});
 
 document.addEventListener('touchend', e => {
+  if (input.touchTimer) clearTimeout(input.touchTimer);
+  input.touchTimer = setTimeout(() => { input.isTouch = false; }, 400);
   if (input.pinching) { input.pinching = false; return; }
   if (e.changedTouches.length) {
     const t = e.changedTouches[0];
@@ -856,6 +867,10 @@ function handleTap(sx, sy) {
   const grid = screenToGrid(sx, sy);
   const gx = grid.gx, gy = grid.gy;
   if (gx < 0 || gy < 0 || gx >= GRID_W || gy >= GRID_H) return;
+
+  // Tap feedback: white diamond pulse
+  const tilePos = gridToScreen(gx, gy);
+  tapFeedbacks.push({ x: tilePos.x, y: tilePos.y, age: 0, life: 0.35 });
 
   switch (input.mode) {
     case 'select': selectAt(gx, gy); break;
@@ -887,6 +902,20 @@ function placeAt(gx, gy) {
   if (!def) return;
   const sz = def.size;
 
+  // Smart tap: if tapping an existing building/field, show its info instead of error
+  const tapTile = G.tiles[gy][gx];
+  if (tapTile.type !== 'empty') {
+    if (tapTile.type === 'field') {
+      const crop = G.crops.find(c => c.gridX === gx && c.gridY === gy);
+      if (crop) showCropInfo(crop);
+      else showFieldInfo(gx, gy);
+    } else if (tapTile.type === 'building') {
+      const b = G.buildings.find(b => b.id === tapTile.entityId);
+      if (b) showBuildingInfo(b);
+    }
+    return;
+  }
+
   // Check all tiles are empty and in bounds
   for (let dy = 0; dy < sz[1]; dy++) {
     for (let dx = 0; dx < sz[0]; dx++) {
@@ -917,11 +946,20 @@ function placeAt(gx, gy) {
   recalcPop();
   spawnStickmen();
 
+  // Floating text for placement
+  const placePos = gridToScreen(gx, gy);
+  floatingTexts.push({text: def.icon + ' placed', x: placePos.x, y: placePos.y - 10, color: '#2c2c2c', life: 1.2, age: 0});
+
   // Tutorial advancement
   if (!G.tutDone) {
     if (G.tutStep === 1 && input.placingType === 'field') { G.tutStep = 2; showTutorial(); }
     else if (G.tutStep === 3 && input.placingType === 'house_s') { G.tutStep = 4; showTutorial(); }
   }
+
+  // Auto-return to select mode after placement
+  input.mode = 'select';
+  input.placingType = null;
+  clearToolbarActive();
 
   clearSpriteCache();
 }
@@ -929,9 +967,31 @@ function placeAt(gx, gy) {
 function plantAt(gx, gy) {
   if (!input.placingCrop) return;
   const tile = G.tiles[gy][gx];
+
+  // Smart tap: tapping a building shows its info
+  if (tile.type === 'building') {
+    const b = G.buildings.find(b => b.id === tile.entityId);
+    if (b) showBuildingInfo(b);
+    return;
+  }
+
   if (tile.type !== 'field') { showDialog('Oops', 'You can only plant on farm fields!'); return; }
+
+  // Smart tap: tapping a ready crop auto-harvests it
   const existing = G.crops.find(c => c.gridX === gx && c.gridY === gy);
-  if (existing) { showDialog('Oops', 'There is already a crop here!'); return; }
+  if (existing) {
+    const eDef = CROP_DEFS[existing.type];
+    const eElapsed = (Date.now() - existing.plantedAt) / 1000;
+    const eSpeed = existing.watered ? 2 : 1;
+    const eProgress = Math.min(1, (eElapsed * eSpeed) / eDef.growTime);
+    if (eProgress >= 1) {
+      window.harvestCrop(existing.id);
+      return;
+    }
+    // Not ready - show crop info instead of error
+    showCropInfo(existing);
+    return;
+  }
 
   const crop = {
     id: uid(), type: input.placingCrop,
@@ -942,7 +1002,18 @@ function plantAt(gx, gy) {
   G.crops.push(crop);
   addXP(1);
 
+  // Floating text for planting
+  const cropDef = CROP_DEFS[input.placingCrop];
+  const pos = gridToScreen(gx, gy);
+  floatingTexts.push({text: cropDef.icon + ' planted', x: pos.x, y: pos.y - 10, color: '#3a7a1a', life: 1.2, age: 0});
+
   if (!G.tutDone && G.tutStep === 2) { G.tutStep = 3; showTutorial(); }
+
+  // Auto-return to select mode after planting
+  input.mode = 'select';
+  input.placingCrop = null;
+  clearToolbarActive();
+
   clearSpriteCache();
 }
 
@@ -989,6 +1060,7 @@ function bulldozeAt(gx, gy) {
 // ===== SECTION H: UI SYSTEM =====
 
 const floatingTexts = [];
+const tapFeedbacks = [];
 let activePanel = null;
 let spriteCache = {};
 
@@ -1037,6 +1109,7 @@ function setToolbarActive(action) {
 
 // Toolbar buttons
 window.toolAction = function(action) {
+  const prevMode = input.mode;
   input.mode = 'select';
   input.placingType = null;
   input.placingCrop = null;
@@ -1063,12 +1136,11 @@ window.toolAction = function(action) {
       showPanel('market-panel');
       break;
     case 'bulldoze':
-      if (input.mode === 'bulldoze') {
+      if (prevMode === 'bulldoze') {
         input.mode = 'select';
         clearToolbarActive();
       } else {
         input.mode = 'bulldoze';
-        setToolbarActive('bulldoze');
         hideAllPanels();
         setToolbarActive('bulldoze');
       }
@@ -1258,10 +1330,37 @@ function showCropInfo(crop) {
 }
 
 function showFieldInfo(gx, gy) {
-  let html = '<p>Empty field - select a crop to plant!</p>';
-  html += `<button onclick="hideInfoPanel()">Close</button>`;
-  showInfoPanel('Farm Field', html);
+  let html = '<div class="recipe-list">';
+  let hasCrops = false;
+  for (const [key, def] of Object.entries(CROP_DEFS)) {
+    if (!G.unlocked.has(key)) continue;
+    hasCrops = true;
+    const timeStr = def.growTime >= 60 ? Math.floor(def.growTime/60)+'m'+((def.growTime%60)||'') : def.growTime+'s';
+    html += `<button class="recipe-btn" onclick="quickPlant('${key}',${gx},${gy})">${def.icon} ${def.name}<br><small>${timeStr}</small></button>`;
+  }
+  html += '</div>';
+  if (!hasCrops) html = '<p>No crops unlocked yet!</p>';
+  html += `<button onclick="hideInfoPanel()" style="margin-top:4px">Close</button>`;
+  showInfoPanel('Plant a Crop', html);
 }
+
+window.quickPlant = function(cropKey, gx, gy) {
+  const existing = G.crops.find(c => c.gridX === gx && c.gridY === gy);
+  if (existing) return;
+  const crop = {
+    id: uid(), type: cropKey,
+    gridX: gx, gridY: gy,
+    plantedAt: Date.now(), stage: 0,
+    watered: false, wateredAt: null
+  };
+  G.crops.push(crop);
+  addXP(1);
+  const def = CROP_DEFS[cropKey];
+  const pos = gridToScreen(gx, gy);
+  floatingTexts.push({text: def.icon + ' planted', x: pos.x, y: pos.y - 10, color: '#3a7a1a', life: 1.2, age: 0});
+  hideInfoPanel();
+  clearSpriteCache();
+};
 
 function showBuildingInfo(b) {
   const def = BUILDING_DEFS[b.type];
@@ -1634,6 +1733,28 @@ function render(dt) {
     ctx.setLineDash([]);
   }
 
+  // Tap feedback diamonds
+  for (let i = tapFeedbacks.length - 1; i >= 0; i--) {
+    const tf = tapFeedbacks[i];
+    tf.age += dt;
+    if (tf.age >= tf.life) { tapFeedbacks.splice(i, 1); continue; }
+    const alpha = 1 - tf.age / tf.life;
+    const scale = 1 + tf.age / tf.life * 0.3;
+    ctx.save();
+    ctx.globalAlpha = alpha * 0.6;
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2;
+    const hw = TILE_W / 2 * scale, hh = TILE_H / 2 * scale;
+    ctx.beginPath();
+    ctx.moveTo(tf.x, tf.y - hh);
+    ctx.lineTo(tf.x + hw, tf.y);
+    ctx.lineTo(tf.x, tf.y + hh);
+    ctx.lineTo(tf.x - hw, tf.y);
+    ctx.closePath();
+    ctx.stroke();
+    ctx.restore();
+  }
+
   restoreCamera();
 
   // Floating texts
@@ -1683,6 +1804,51 @@ function gameLoop(ts) {
 
   requestAnimationFrame(gameLoop);
 }
+
+// ===== HINTS =====
+
+window.showHint = function() {
+  const hasFields = G.buildings.some(b => b.type === 'field');
+  const readyCrops = G.crops.filter(c => {
+    const def = CROP_DEFS[c.type];
+    const elapsed = (Date.now() - c.plantedAt) / 1000;
+    const speed = c.watered ? 2 : 1;
+    return (elapsed * speed) / def.growTime >= 1;
+  });
+  const hasMarket = G.buildings.some(b => b.type === 'market');
+  const hasMarketItems = hasMarket && (
+    Object.entries(CROP_DEFS).some(([k]) => (G.inventory[k] || 0) > 0) ||
+    Object.entries(GOODS_INFO).some(([k]) => (G.inventory[k] || 0) > 0)
+  );
+  const idleFactory = G.buildings.find(b =>
+    ['bakery','dairy','juice'].includes(b.type) && b.recipe == null
+  );
+
+  if (!hasFields) {
+    showDialog('Hint', 'Tap Farm below, then place a Field on the map. Fields let you grow crops!');
+  } else if (readyCrops.length > 0) {
+    showDialog('Hint', 'You have ' + readyCrops.length + ' crop(s) ready to harvest! Tap them to collect.');
+  } else if (hasMarketItems) {
+    showDialog('Hint', 'You have goods to sell! Tap Sell to open the market and earn coins.');
+  } else if (idleFactory) {
+    const def = BUILDING_DEFS[idleFactory.type];
+    showDialog('Hint', 'Your ' + def.name + ' is idle. Tap it to start producing goods!');
+  } else if (G.crops.length === 0 && hasFields) {
+    showDialog('Hint', 'Your fields are empty! Tap Farm and pick a crop, or tap an empty field to quick-plant.');
+  } else if (!hasMarket && G.unlocked.has('market')) {
+    showDialog('Hint', 'Build a Market to sell your crops and goods for coins!');
+  } else {
+    const tips = [
+      'Build houses to increase population and earn more XP!',
+      'Build a Barn for extra storage space.',
+      'Water your crops with a Well to grow them 2x faster!',
+      'Factories turn raw crops into valuable goods.',
+      'Decorations like trees and benches earn XP too!',
+      'Tap any building or crop to see details.',
+    ];
+    showDialog('Hint', tips[Math.floor(Math.random() * tips.length)]);
+  }
+};
 
 // ===== TUTORIAL =====
 
